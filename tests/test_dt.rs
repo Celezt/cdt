@@ -33,7 +33,8 @@ mod tests {
 
         println!("{}", root.len());
 
-        println!("{:#?}", root.get_child(1).unwrap().get_child(0).unwrap());
+        println!("{:#?}", root.child(1).unwrap().child(0).unwrap());
+        println!("{:#?}", root.child(1).unwrap().child(0).unwrap().root());
     }
 
     #[test]

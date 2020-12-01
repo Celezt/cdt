@@ -91,7 +91,7 @@ where
     pub fn len(&self) -> usize {
         self.0.borrow().children.len()
     }
-    /// Return a reference to the latest parent node.
+    /// Returns a reference to the latest parent node.
     ///
     /// # Panics
     ///
@@ -101,7 +101,7 @@ where
             try_opt!(self.0.borrow().last_parent.as_ref()).upgrade()
         )))
     }
-    /// Return a reference to the latest child node.
+    /// Returns a reference to the latest child node.
     ///
     /// # Panics
     ///
@@ -109,14 +109,47 @@ where
     pub fn last_child(&self) -> Option<DT<T, U>> {
         Some(DT(try_opt!(self.0.borrow().last_child.as_ref()).clone()))
     }
-    /// Return a reference to a child by the index
+    /// Returns a reference to a child by the index
     ///
     ///
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn get_child(&self, index: usize) -> Option<DT<T, U>> {
+    pub fn child(&self, index: usize) -> Option<DT<T, U>> {
         Some(DT(try_opt!(self.0.borrow().children.get(index)).clone()))
+    }
+    /// Returns the root of the decision tree.
+    ///
+    /// O(N)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn root(&self) -> DT<T, U> {
+        // Recursion
+        match self.last_parent() {
+            Some(_) => self.last_parent().unwrap().root(),
+            None => self.clone(),
+        }
+    }
+    /// Returns a node based on the steps in the hierarchy.
+    /// If it is unable to go back that far, return `None`.
+    ///
+    /// O(N)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn back(&self, steps: usize) -> Option<DT<T, U>> {
+        if steps > 0 {
+            // Recursion
+            match self.last_parent() {
+                Some(_) => self.last_parent().unwrap().back(steps),
+                None => None,
+            }
+        } else {
+            Some(self.clone())
+        }
     }
     /// Returns a shared reference to this node's data
     ///
@@ -153,5 +186,17 @@ where
         self_borrow.children.push(new_child.0.clone());
 
         self.clone()
+    }
+    /// Returns true if it has any children.
+    pub fn has_children(&self) -> bool {
+        self.0.borrow().children.len() > 0
+    }
+    /// Returns true if it has any parents (not root).
+    pub fn has_parent(&self) -> bool {
+        self.last_parent().is_some()
+    }
+    /// Returns true if it is the root (no parents).
+    pub fn is_root(&self) -> bool {
+        self.last_parent().is_none()
     }
 }
