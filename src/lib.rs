@@ -88,7 +88,7 @@ where
         })))
     }
     /// Returns the amount of children that node contains.
-    pub fn child_len(&self) -> usize {
+    pub fn len(&self) -> usize {
         self.0.borrow().children.len()
     }
     /// Return a reference to the latest parent node.
@@ -109,11 +109,28 @@ where
     pub fn last_child(&self) -> Option<DT<T, U>> {
         Some(DT(try_opt!(self.0.borrow().last_child.as_ref()).clone()))
     }
-    /// Borrow an immutable reference
+    /// Return a reference to a child by the index
+    ///
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn get_child(&self, index: usize) -> Option<DT<T, U>> {
+        Some(DT(try_opt!(self.0.borrow().children.get(index)).clone()))
+    }
+    /// Returns a shared reference to this node's data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
     pub fn borrow(&self) -> Ref<T> {
         Ref::map(self.0.borrow(), |v| &v.data)
     }
-    /// Borrow an mutable reference
+    /// Returns a unique/mutable reference to this node's data
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently borrowed.
     pub fn borrow_mut(&mut self) -> RefMut<T> {
         RefMut::map(self.0.borrow_mut(), |v| &mut v.data)
     }
