@@ -31,8 +31,8 @@ where
     U: Eq + PartialEq,
 {
     children: Vec<Link<T, U>>,
-    last_parent: Option<WeakLink<T, U>>,
-    last_child: Option<Link<T, U>>,
+    latest_parent: Option<WeakLink<T, U>>,
+    latest_child: Option<Link<T, U>>,
     decision: U,
     data: T,
 }
@@ -81,8 +81,8 @@ where
     pub fn new(data: T, decision: U) -> DT<T, U> {
         DT(Rc::new(RefCell::new(Node {
             children: Vec::new(),
-            last_parent: None,
-            last_child: None,
+            latest_parent: None,
+            latest_child: None,
             decision: decision,
             data: data,
         })))
@@ -96,18 +96,21 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn last_parent(&self) -> Option<DT<T, U>> {
-        Some(DT(try_opt!(
-            try_opt!(self.0.borrow().last_parent.as_ref()).upgrade()
-        )))
+    pub fn latest_parent(&self) -> Option<DT<T, U>> {
+        Some(DT(try_opt!(try_opt!(self
+            .0
+            .borrow()
+            .latest_parent
+            .as_ref())
+        .upgrade())))
     }
     /// Returns a reference to the latest child node.
     ///
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn last_child(&self) -> Option<DT<T, U>> {
-        Some(DT(try_opt!(self.0.borrow().last_child.as_ref()).clone()))
+    pub fn latest_child(&self) -> Option<DT<T, U>> {
+        Some(DT(try_opt!(self.0.borrow().latest_child.as_ref()).clone()))
     }
     /// Returns a reference to a child by the index
     ///
@@ -118,6 +121,24 @@ where
     pub fn child(&self, index: usize) -> Option<DT<T, U>> {
         Some(DT(try_opt!(self.0.borrow().children.get(index)).clone()))
     }
+    /// Returns a reference to the first child.
+    ///
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn first_child(&self) -> Option<DT<T, U>> {
+        self.child(0)
+    }
+    /// Returns a reference to the last child.
+    ///
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn last_child(&self) -> Option<DT<T, U>> {
+        self.child(self.len())
+    }
     /// Returns the root of the decision tree.
     ///
     /// O(N)
@@ -127,8 +148,8 @@ where
     /// Panics if the node is currently mutably borrowed.
     pub fn root(&self) -> DT<T, U> {
         // Recursion
-        match self.last_parent() {
-            Some(_) => self.last_parent().unwrap().root(),
+        match self.latest_parent() {
+            Some(_) => self.latest_parent().unwrap().root(),
             None => self.clone(),
         }
     }
@@ -143,8 +164,8 @@ where
     pub fn back(&self, steps: usize) -> Option<DT<T, U>> {
         if steps > 0 {
             // Recursion
-            match self.last_parent() {
-                Some(_) => self.last_parent().unwrap().back(steps),
+            match self.latest_parent() {
+                Some(_) => self.latest_parent().unwrap().back(steps),
                 None => None,
             }
         } else {
@@ -179,9 +200,9 @@ where
         let mut self_borrow = self.0.borrow_mut();
         let mut new_child_borrow = new_child.0.borrow_mut();
         // Borrow a reference of the latest parent (this)
-        new_child_borrow.last_parent = Some(Rc::downgrade(&self.0));
+        new_child_borrow.latest_parent = Some(Rc::downgrade(&self.0));
         // Borrow a reference of the latest child (new_child)
-        self_borrow.last_child = Some(new_child.0.clone());
+        self_borrow.latest_child = Some(new_child.0.clone());
 
         self_borrow.children.push(new_child.0.clone());
 
@@ -193,10 +214,10 @@ where
     }
     /// Returns true if it has any parents (not root).
     pub fn has_parent(&self) -> bool {
-        self.last_parent().is_some()
+        self.latest_parent().is_some()
     }
     /// Returns true if it is the root (no parents).
     pub fn is_root(&self) -> bool {
-        self.last_parent().is_none()
+        self.latest_parent().is_none()
     }
 }

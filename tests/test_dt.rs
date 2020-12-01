@@ -11,22 +11,22 @@ mod tests {
         println!("{}", root.len());
 
         root.append(node.clone());
-        println!("{}", node.last_parent().unwrap());
+        println!("{}", node.latest_parent().unwrap());
 
         println!("{}", root.len());
 
         root.append(DT::new("data3", true))
-            .last_child()
+            .latest_child()
             .unwrap()
             .append(DT::new("child1", true))
             .append(DT::new("child2", false))
-            .last_child()
+            .latest_child()
             .unwrap()
             .append(DT::new("child3", true))
             .append(DT::new("child4", false))
-            .last_parent()
+            .latest_parent()
             .unwrap()
-            .last_parent()
+            .latest_parent()
             .unwrap()
             .append(DT::new("data4", false))
             .append(DT::new("data5", false));
@@ -43,5 +43,28 @@ mod tests {
         // Test appending itself
         let mut root = DT::new("root", true);
         root.append(root.clone());
+    }
+
+    #[test]
+    fn test_back() {
+        let mut root = DT::new("data1", true);
+        root.append(DT::new("data2", false))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("data3", true))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("data4", false))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("data5", true))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("data6", false))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("data7", true));
+
+        println!("{:#?}", root.child(0));
     }
 }
