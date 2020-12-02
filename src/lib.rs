@@ -1,7 +1,7 @@
 // https://github.com/SimonSapin/rust-forest
 // https://github.com/RazrFalcon/rctree/blob/master/src/lib.rs
 
-use std::cell::{Cell, Ref, RefCell, RefMut};
+use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
 
 thread_local! {static ID_COUNT: i32 = 0;}
@@ -23,12 +23,12 @@ macro_rules! try_opt {
 
 pub struct DT<T, U>(Link<T, U>)
 where
-    U: Eq + PartialEq;
+    U: PartialEq + PartialOrd;
 
 #[derive(std::fmt::Debug)]
 struct Node<T, U>
 where
-    U: Eq + PartialEq,
+    U: PartialEq + PartialOrd,
 {
     children: Vec<Link<T, U>>,
     latest_parent: Option<WeakLink<T, U>>,
@@ -38,13 +38,13 @@ where
 }
 
 /// Cloning a 'Node' only increments a reference count. It does not copy the data.
-impl<T, U: Eq> Clone for DT<T, U> {
+impl<T, U: PartialEq + PartialOrd> Clone for DT<T, U> {
     fn clone(&self) -> Self {
         DT(Rc::clone(&self.0))
     }
 }
 
-impl<T, U: Eq> PartialEq for DT<T, U> {
+impl<T, U: PartialEq + PartialOrd> PartialEq for DT<T, U> {
     fn eq(&self, other: &DT<T, U>) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
@@ -53,7 +53,7 @@ impl<T, U: Eq> PartialEq for DT<T, U> {
 // If T has trait debug
 impl<T: std::fmt::Debug, U: std::fmt::Debug> std::fmt::Debug for DT<T, U>
 where
-    U: Eq + PartialEq,
+    U: PartialEq + PartialOrd,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let self_borrow = self.0.borrow();
@@ -66,7 +66,7 @@ where
 
 impl<T: std::fmt::Display, U> std::fmt::Display for DT<T, U>
 where
-    U: Eq + PartialEq,
+    U: PartialEq + PartialOrd,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.borrow(), f)
@@ -75,7 +75,7 @@ where
 
 impl<T, U> DT<T, U>
 where
-    U: Eq + PartialEq,
+    U: PartialEq + PartialOrd,
 {
     /// Create new instance of a node.
     pub fn new(data: T, decision: U) -> DT<T, U> {
@@ -127,7 +127,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn first_child(&self) -> Option<DT<T, U>> {
+    pub fn first(&self) -> Option<DT<T, U>> {
         self.child(0)
     }
     /// Returns a reference to the last child.
@@ -136,8 +136,8 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn last_child(&self) -> Option<DT<T, U>> {
-        self.child(self.len())
+    pub fn last(&self) -> Option<DT<T, U>> {
+        self.child(self.len() - 1)
     }
     /// Returns the root of the decision tree.
     ///
@@ -165,7 +165,45 @@ where
         if steps > 0 {
             // Recursion
             match self.latest_parent() {
-                Some(_) => self.latest_parent().unwrap().back(steps),
+                Some(_) => self.latest_parent().unwrap().back(steps - 1),
+                None => None,
+            }
+        } else {
+            Some(self.clone())
+        }
+    }
+    /// Returns a node based on the steps in the hierarchy.
+    /// If it is unable to go back that far, return `None`.
+    ///
+    /// O(N)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn forward_first(&self, steps: usize) -> Option<DT<T, U>> {
+        if steps > 0 {
+            // Recursion
+            match self.first() {
+                Some(_) => self.first().unwrap().forward_first(steps - 1),
+                None => None,
+            }
+        } else {
+            Some(self.clone())
+        }
+    }
+    /// Returns a node based on the steps in the hierarchy.
+    /// If it is unable to go back that far, return `None`.
+    ///
+    /// O(N)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node is currently mutably borrowed.
+    pub fn forward_last(&self, steps: usize) -> Option<DT<T, U>> {
+        if steps > 0 {
+            // Recursion
+            match self.last() {
+                Some(_) => self.last().unwrap().forward_last(steps - 1),
                 None => None,
             }
         } else {
@@ -219,5 +257,37 @@ where
     /// Returns true if it is the root (no parents).
     pub fn is_root(&self) -> bool {
         self.latest_parent().is_none()
+    }
+}
+
+pub struct Iterate<T, U>
+where
+    U: PartialEq + PartialOrd,
+{
+    current: Option<DT<T, U>>,
+}
+
+impl<T, U> Iterate<T, U>
+where
+    U: PartialEq + PartialOrd,
+{
+    pub fn start(node: DT<T, U>) -> Iterate<T, U> {
+        Iterate {
+            current: Some(node),
+        }
+    }
+
+    pub fn traverse(&mut self, decision: U) {
+        for child in self.current.clone().unwrap().0.borrow().children.iter() {
+            let child_borrow = child.borrow();
+            if decision == child_borrow.decision {
+                println!("equal");
+            } else if decision > child_borrow.decision {
+                println!("greater");
+            }
+            else{
+                println!("not");
+            }
+        }
     }
 }
