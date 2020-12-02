@@ -14,7 +14,7 @@ mod tests {
             .append(DT::new("data7", 6));
 
         let mut travel = Traverse::start(root);
-        println!("{:?}", travel.traverse(0, PartialOp::Min));
+        println!("{:?}", travel.traverse(7, PartialOp::Max));
     }
 
     #[test]

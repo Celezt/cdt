@@ -360,6 +360,7 @@ where
                         }
                         // Return if on the last child
                         if i >= children.len() - 1 {
+                            // If decision is less than smallest value
                             if decision < min_node.borrow().decision.unwrap() {
                                 return Some(DT(min_node.clone()));
                             }
@@ -367,7 +368,27 @@ where
                     }
                 }
                 PartialOp::Max => {
-                    std::todo!()
+                    let link = &self.current.clone().unwrap();
+                    // Start max value
+                    let mut max_node = &link.borrow().children[0];
+                    let children = &link.borrow().children;
+                    for (i, child) in children.iter().enumerate() {
+                        // Continue if decision is none
+                        if child.borrow().decision.is_none() {
+                            continue;
+                        }
+                        // Set the max node if the child is greater than it
+                        if max_node.borrow().decision.unwrap() < child.borrow().decision.unwrap() {
+                            max_node = child;
+                        }
+                        // Return if on the last child
+                        if i >= children.len() - 1 {
+                            // If decision is greater than biggest value
+                            if decision > max_node.borrow().decision.unwrap() {
+                                return Some(DT(max_node.clone()));
+                            }
+                        }
+                    }
                 }
                 PartialOp::Average => {
                     std::todo!()
