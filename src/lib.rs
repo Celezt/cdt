@@ -11,13 +11,17 @@ type Link<T, U> = Rc<RefCell<Node<T, U>>>;
 /// Weak mutable reference.
 type WeakLink<T, U> = Weak<RefCell<Node<T, U>>>;
 
-#[derive(Debug)]
-pub enum PartialType {
+/// Partial Operator.
+#[derive(Debug, Eq, PartialEq)]
+pub enum PartialOp {
     Equal,
     Greater,
     GreaterEqual,
     Less,
     LessEqual,
+    Min,
+    Max,
+    Average,
 }
 
 /// Return value if `Some`, else return `None`.
@@ -90,6 +94,28 @@ where
 
 impl<T, U> DT<T, U>
 where
+    T: Clone,
+    U: PartialEq + PartialOrd + Copy,
+{
+    /// Returns the data value.
+    pub fn data_clone(&self) -> T {
+        self.0.borrow().data.clone()
+    }
+}
+
+impl<T, U> DT<T, U>
+where
+    T: Copy,
+    U: PartialEq + PartialOrd + Copy,
+{
+    /// Returns the data value.
+    pub fn data(&self) -> T {
+        self.0.borrow().data
+    }
+}
+
+impl<T, U> DT<T, U>
+where
     U: PartialEq + PartialOrd + Copy,
 {
     /// Initialize the decision tree.
@@ -116,6 +142,10 @@ where
     /// Returns the amount of children that node contains.
     pub fn len(&self) -> usize {
         self.0.borrow().children.len()
+    }
+    /// Returns the decision value.
+    pub fn decision(&self) -> Option<U> {
+        self.0.borrow().decision
     }
     /// Returns a reference to the latest parent node.
     ///
@@ -307,43 +337,80 @@ where
     /// Traverse to next node based on its decision.
     ///
     /// If none of the operations is met, return `None`.
-    pub fn traverse(&mut self, decision: U, partial_type: PartialType) -> Option<DT<T, U>> {
-        for child in self.current.clone().unwrap().borrow().children.iter() {
-            let child_borrow = &child.borrow();
-            // Continue if decision is none
-            if child_borrow.decision.is_none() {
-                continue;
+    pub fn traverse(&mut self, decision: U, partial_op: PartialOp) -> Option<DT<T, U>> {
+        // If it is an superiority type or not.
+        if matches!(
+            partial_op,
+            PartialOp::Min | PartialOp::Max | PartialOp::Average
+        ) {
+            match partial_op {
+                PartialOp::Min => {
+                    let link = &self.current.clone().unwrap();
+                    // Start min value
+                    let mut min_node = &link.borrow().children[0];
+                    let children = &link.borrow().children;
+                    for (i, child) in children.iter().enumerate() {
+                        // Continue if decision is none
+                        if child.borrow().decision.is_none() {
+                            continue;
+                        }
+                        // Set the min node if the child is less than it
+                        if min_node.borrow().decision.unwrap() > child.borrow().decision.unwrap() {
+                            min_node = child;
+                        }
+                        // Return if on the last child
+                        if i > children.len() - 1 {
+                            return Some(DT(min_node.clone()));
+                        }
+                    }
+                }
+                PartialOp::Max => {
+                    std::todo!()
+                }
+                PartialOp::Average => {
+                    std::todo!()
+                }
+                _ => panic!("{:?} is not supported", partial_op),
             }
-            match partial_type {
-                PartialType::Greater => {
-                    if decision > child_borrow.decision.unwrap() {
-                        self.current = Some(child.clone());
-                        return Some(DT(child.clone()));
-                    }
+        } else {
+            for child in self.current.clone().unwrap().borrow().children.iter() {
+                let child_borrow = &child.borrow();
+                // Continue if decision is none
+                if child_borrow.decision.is_none() {
+                    continue;
                 }
-                PartialType::GreaterEqual => {
-                    if decision >= child_borrow.decision.unwrap() {
-                        self.current = Some(child.clone());
-                        return Some(DT(child.clone()));
+                match partial_op {
+                    PartialOp::Greater => {
+                        if decision > child_borrow.decision.unwrap() {
+                            self.current = Some(child.clone());
+                            return Some(DT(child.clone()));
+                        }
                     }
-                }
-                PartialType::Less => {
-                    if decision < child_borrow.decision.unwrap() {
-                        self.current = Some(child.clone());
-                        return Some(DT(child.clone()));
+                    PartialOp::GreaterEqual => {
+                        if decision >= child_borrow.decision.unwrap() {
+                            self.current = Some(child.clone());
+                            return Some(DT(child.clone()));
+                        }
                     }
-                }
-                PartialType::LessEqual => {
-                    if decision <= child_borrow.decision.unwrap() {
-                        self.current = Some(child.clone());
-                        return Some(DT(child.clone()));
+                    PartialOp::Less => {
+                        if decision < child_borrow.decision.unwrap() {
+                            self.current = Some(child.clone());
+                            return Some(DT(child.clone()));
+                        }
                     }
-                }
-                PartialType::Equal => {
-                    if decision == child_borrow.decision.unwrap() {
-                        self.current = Some(child.clone());
-                        return Some(DT(child.clone()));
+                    PartialOp::LessEqual => {
+                        if decision <= child_borrow.decision.unwrap() {
+                            self.current = Some(child.clone());
+                            return Some(DT(child.clone()));
+                        }
                     }
+                    PartialOp::Equal => {
+                        if decision == child_borrow.decision.unwrap() {
+                            self.current = Some(child.clone());
+                            return Some(DT(child.clone()));
+                        }
+                    }
+                    _ => panic!("{:?} is not supported", partial_op),
                 }
             }
         }

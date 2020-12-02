@@ -1,20 +1,10 @@
 #[cfg(test)]
 mod tests {
-    use cdt::DT;
-    use cdt::{PartialType, Traverse};
+    use cdt::{PartialOp, Traverse, DT};
 
     #[test]
     fn test_dt() {
         let mut root = DT::init("data1");
-        let node = DT::new("data2", false);
-        println!("{:#?}", root);
-        println!("{:#?}", node);
-        println!("{}", root.len());
-
-        root.append(node.clone());
-        println!("{}", node.latest_parent().unwrap());
-
-        println!("{}", root.len());
 
         root.append(DT::new("data3", true))
             .latest_child()
@@ -31,11 +21,6 @@ mod tests {
             .unwrap()
             .append(DT::new("data4", false))
             .append(DT::new("data5", false));
-
-        println!("{}", root.len());
-
-        println!("{:#?}", root.child(1).unwrap().child(0).unwrap());
-        println!("{:#?}", root.child(1).unwrap().child(0).unwrap().root());
     }
 
     #[test]
@@ -105,9 +90,9 @@ mod tests {
 
         let mut travel = Traverse::start(root);
 
-        println!("{:?}", travel.traverse(3, PartialType::Less));
-        println!("{:?}", travel.traverse(5, PartialType::Greater));
-        println!("{:?}", travel.traverse(4, PartialType::Equal));
+        println!("{:?}", travel.traverse(3, PartialOp::Less));
+        println!("{:?}", travel.traverse(5, PartialOp::Greater));
+        println!("{:?}", travel.traverse(4, PartialOp::Equal));
     }
 
     #[test]
@@ -137,8 +122,8 @@ mod tests {
 
         let mut travel = Traverse::start(root);
 
-        println!("{:?}", travel.traverse('c', PartialType::Less));
-        println!("{:?}", travel.traverse('f', PartialType::Equal));
-        println!("{:?}", travel.traverse('h', PartialType::Greater));
+        println!("{:?}", travel.traverse('c', PartialOp::Less));
+        println!("{:?}", travel.traverse('f', PartialOp::Equal));
+        println!("{:?}", travel.traverse('h', PartialOp::Greater));
     }
 }
