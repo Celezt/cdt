@@ -6,21 +6,15 @@ mod tests {
     fn test_dt() {
         let mut root = DT::init("data1");
 
-        root.append(DT::new("data3", true))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("child1", true))
-            .append(DT::new("child2", false))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("child3", true))
-            .append(DT::new("child4", false))
-            .latest_parent()
-            .unwrap()
-            .latest_parent()
-            .unwrap()
-            .append(DT::new("data4", false))
-            .append(DT::new("data5", false));
+        root.append(DT::new("data2", 1))
+            .append(DT::new("data3", 2))
+            .append(DT::new("data4", 3))
+            .append(DT::new("data5", 4))
+            .append(DT::new("data6", 5))
+            .append(DT::new("data7", 6));
+
+        let mut travel = Traverse::start(root);
+        println!("{:?}", travel.traverse(0, PartialOp::Min));
     }
 
     #[test]

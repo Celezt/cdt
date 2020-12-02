@@ -359,8 +359,10 @@ where
                             min_node = child;
                         }
                         // Return if on the last child
-                        if i > children.len() - 1 {
-                            return Some(DT(min_node.clone()));
+                        if i >= children.len() - 1 {
+                            if decision < min_node.borrow().decision.unwrap() {
+                                return Some(DT(min_node.clone()));
+                            }
                         }
                     }
                 }
