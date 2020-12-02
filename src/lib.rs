@@ -11,6 +11,15 @@ type Link<T, U> = Rc<RefCell<Node<T, U>>>;
 /// Weak mutable reference.
 type WeakLink<T, U> = Weak<RefCell<Node<T, U>>>;
 
+#[derive(Debug)]
+pub enum PartialType {
+    Equal,
+    Greater,
+    GreaterEqual,
+    Less,
+    LessEqual,
+}
+
 /// Return value if `Some`, else return `None`.
 macro_rules! try_opt {
     ($expr: expr) => {
@@ -23,28 +32,34 @@ macro_rules! try_opt {
 
 pub struct DT<T, U>(Link<T, U>)
 where
-    U: PartialEq + PartialOrd;
+    U: PartialEq + PartialOrd + Copy;
 
 #[derive(std::fmt::Debug)]
 struct Node<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
     children: Vec<Link<T, U>>,
     latest_parent: Option<WeakLink<T, U>>,
     latest_child: Option<Link<T, U>>,
-    decision: U,
+    decision: Option<U>,
     data: T,
 }
 
 /// Cloning a 'Node' only increments a reference count. It does not copy the data.
-impl<T, U: PartialEq + PartialOrd> Clone for DT<T, U> {
+impl<T, U> Clone for DT<T, U>
+where
+    U: PartialEq + PartialOrd + Copy,
+{
     fn clone(&self) -> Self {
         DT(Rc::clone(&self.0))
     }
 }
 
-impl<T, U: PartialEq + PartialOrd> PartialEq for DT<T, U> {
+impl<T, U: PartialEq + PartialOrd> PartialEq for DT<T, U>
+where
+    U: PartialEq + PartialOrd + Copy,
+{
     fn eq(&self, other: &DT<T, U>) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
@@ -53,7 +68,7 @@ impl<T, U: PartialEq + PartialOrd> PartialEq for DT<T, U> {
 // If T has trait debug
 impl<T: std::fmt::Debug, U: std::fmt::Debug> std::fmt::Debug for DT<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let self_borrow = self.0.borrow();
@@ -66,7 +81,7 @@ where
 
 impl<T: std::fmt::Display, U> std::fmt::Display for DT<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         std::fmt::Display::fmt(&self.borrow(), f)
@@ -75,15 +90,26 @@ where
 
 impl<T, U> DT<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
+    /// Initialize the decision tree.
+    /// It is also possible to use `new`, but there is no reason to give the root any decisions.
+    pub fn init(data: T) -> DT<T, U> {
+        DT(Rc::new(RefCell::new(Node {
+            children: Vec::new(),
+            latest_parent: None,
+            latest_child: None,
+            decision: None,
+            data: data,
+        })))
+    }
     /// Create new instance of a node.
     pub fn new(data: T, decision: U) -> DT<T, U> {
         DT(Rc::new(RefCell::new(Node {
             children: Vec::new(),
             latest_parent: None,
             latest_child: None,
-            decision: decision,
+            decision: Some(decision),
             data: data,
         })))
     }
@@ -260,34 +286,67 @@ where
     }
 }
 
-pub struct Iterate<T, U>
+pub struct Traverse<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
-    current: Option<DT<T, U>>,
+    current: Option<Link<T, U>>,
 }
 
-impl<T, U> Iterate<T, U>
+impl<T, U> Traverse<T, U>
 where
-    U: PartialEq + PartialOrd,
+    U: PartialEq + PartialOrd + Copy,
 {
-    pub fn start(node: DT<T, U>) -> Iterate<T, U> {
-        Iterate {
-            current: Some(node),
+    /// Start node to traverse from.
+    pub fn start(node: DT<T, U>) -> Traverse<T, U> {
+        Traverse {
+            current: Some(node.0),
         }
     }
 
-    pub fn traverse(&mut self, decision: U) {
-        for child in self.current.clone().unwrap().0.borrow().children.iter() {
-            let child_borrow = child.borrow();
-            if decision == child_borrow.decision {
-                println!("equal");
-            } else if decision > child_borrow.decision {
-                println!("greater");
+    /// Traverse to next node based on its decision.
+    ///
+    /// If none of the operations is met, return `None`.
+    pub fn traverse(&mut self, decision: U, partial_type: PartialType) -> Option<DT<T, U>> {
+        for child in self.current.clone().unwrap().borrow().children.iter() {
+            let child_borrow = &child.borrow();
+            // Continue if decision is none
+            if child_borrow.decision.is_none() {
+                continue;
             }
-            else{
-                println!("not");
+            match partial_type {
+                PartialType::Greater => {
+                    if decision > child_borrow.decision.unwrap() {
+                        self.current = Some(child.clone());
+                        return Some(DT(child.clone()));
+                    }
+                }
+                PartialType::GreaterEqual => {
+                    if decision >= child_borrow.decision.unwrap() {
+                        self.current = Some(child.clone());
+                        return Some(DT(child.clone()));
+                    }
+                }
+                PartialType::Less => {
+                    if decision < child_borrow.decision.unwrap() {
+                        self.current = Some(child.clone());
+                        return Some(DT(child.clone()));
+                    }
+                }
+                PartialType::LessEqual => {
+                    if decision <= child_borrow.decision.unwrap() {
+                        self.current = Some(child.clone());
+                        return Some(DT(child.clone()));
+                    }
+                }
+                PartialType::Equal => {
+                    if decision == child_borrow.decision.unwrap() {
+                        self.current = Some(child.clone());
+                        return Some(DT(child.clone()));
+                    }
+                }
             }
         }
+        None
     }
 }

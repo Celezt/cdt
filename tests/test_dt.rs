@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod tests {
-    use cdt::Iterate;
     use cdt::DT;
+    use cdt::{PartialType, Traverse};
 
     #[test]
     fn test_dt() {
-        let mut root = DT::new("data1", true);
+        let mut root = DT::init("data1");
         let node = DT::new("data2", false);
         println!("{:#?}", root);
         println!("{:#?}", node);
@@ -48,7 +48,7 @@ mod tests {
 
     #[test]
     fn test_move() {
-        let mut root = DT::new("data1", true);
+        let mut root = DT::init("data1");
         root.append(DT::new("data2", false))
             .latest_child()
             .unwrap()
@@ -83,22 +83,62 @@ mod tests {
     }
 
     #[test]
-    fn test_iterate() {
-        let mut root = DT::new("data1", true);
-        root.append(DT::new("1_0", false))
+    fn test_iterate_1() {
+        let mut root = DT::init("0_0");
+        root.append(DT::new("1", 2))
             .latest_child()
             .unwrap()
-            .append(DT::new("1_1", true))
-            .append(DT::new("1_2", true))
+            .append(DT::new("1_1", 3))
+            .append(DT::new("1_2", 4))
             .latest_parent()
             .unwrap()
-            .append(DT::new("2_0", true))
+            .append(DT::new("2", 5))
             .latest_child()
             .unwrap()
-            .append(DT::new("2_1", true))
-            .append(DT::new("2_2", true));
+            .append(DT::new("2_1", 8))
+            .append(DT::new("2_2", 4))
+            .latest_child()
+            .unwrap()
+            .append(DT::new("2_2_1", 2))
+            .append(DT::new("2_2_2", 1))
+            .append(DT::new("2_2_3", 4));
 
-        let mut iter = Iterate::start(root);
-        println!("{:#?}", iter.traverse(false));
+        let mut travel = Traverse::start(root);
+
+        println!("{:?}", travel.traverse(3, PartialType::Less));
+        println!("{:?}", travel.traverse(5, PartialType::Greater));
+        println!("{:?}", travel.traverse(4, PartialType::Equal));
+    }
+
+    #[test]
+    fn test_iterate_2() {
+        #[derive(Debug)]
+        struct Data<'a> {
+            text: &'a str,
+        }
+        let mut root = DT::init(Data { text: "init" });
+        root.append(DT::new(Data { text: "hey" }, 'a'))
+            .latest_child()
+            .unwrap()
+            .append(DT::new(Data { text: "what" }, 'b'))
+            .append(DT::new(Data { text: "is" }, 'c'))
+            .latest_parent()
+            .unwrap()
+            .append(DT::new(Data { text: "up" }, 'd'))
+            .latest_child()
+            .unwrap()
+            .append(DT::new(Data { text: "are" }, 'e'))
+            .append(DT::new(Data { text: "you" }, 'f'))
+            .latest_child()
+            .unwrap()
+            .append(DT::new(Data { text: "alright" }, 'g'))
+            .append(DT::new(Data { text: "bro" }, 'h'))
+            .append(DT::new(Data { text: "?" }, 'i'));
+
+        let mut travel = Traverse::start(root);
+
+        println!("{:?}", travel.traverse('c', PartialType::Less));
+        println!("{:?}", travel.traverse('f', PartialType::Equal));
+        println!("{:?}", travel.traverse('h', PartialType::Greater));
     }
 }
