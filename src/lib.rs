@@ -21,7 +21,7 @@ pub enum PartialOp {
     LessEqual,
     Min,
     Max,
-    Average,
+    Median,
 }
 
 /// Return value if `Some`, else return `None`.
@@ -341,7 +341,7 @@ where
         // If it is an superiority type or not.
         if matches!(
             partial_op,
-            PartialOp::Min | PartialOp::Max | PartialOp::Average
+            PartialOp::Min | PartialOp::Max | PartialOp::Median
         ) {
             match partial_op {
                 PartialOp::Min => {
@@ -390,8 +390,23 @@ where
                         }
                     }
                 }
-                PartialOp::Average => {
-                    std::todo!()
+                PartialOp::Median => {
+                    let link = &self.current.clone().unwrap();
+                    let children = &mut link.borrow_mut().children;
+                    // Sort based on decision values
+                    children.sort_by(|a, b| {
+                        a.borrow()
+                            .decision
+                            .unwrap()
+                            .partial_cmp(&b.borrow().decision.unwrap())
+                            .unwrap()
+                    });
+                    // Average value
+                    let average_node = children[children.len() / 2].clone();
+                    // If decision is greater than biggest value
+                    if decision == average_node.borrow().decision.unwrap() {
+                        return Some(DT(average_node.clone()));
+                    }
                 }
                 _ => panic!("{:?} is not supported", partial_op),
             }
