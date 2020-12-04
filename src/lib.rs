@@ -1,10 +1,12 @@
 // https://github.com/SimonSapin/rust-forest
 // https://github.com/RazrFalcon/rctree/blob/master/src/lib.rs
 
+mod macros;
+#[allow(unused_imports)]
+use crate::macros::*;
+
 use std::cell::{Ref, RefCell, RefMut};
 use std::rc::{Rc, Weak};
-
-thread_local! {static ID_COUNT: i32 = 0;}
 
 /// Mutable reference.
 type Link<T, U> = Rc<RefCell<Node<T, U>>>;
@@ -19,19 +21,12 @@ pub enum PartialOp {
     GreaterEqual,
     Less,
     LessEqual,
+    /// Compare to the smallest value of the available.
     Min,
+    /// Compare to the biggest value of the available.
     Max,
+    /// Compare to the median value of the available
     Median,
-}
-
-/// Return value if `Some`, else return `None`.
-macro_rules! try_opt {
-    ($expr: expr) => {
-        match $expr {
-            Some(value) => value,
-            None => return None,
-        }
-    };
 }
 
 pub struct DT<T, U>(Link<T, U>)
@@ -129,6 +124,7 @@ where
             data: data,
         })))
     }
+
     /// Create new instance of a node.
     pub fn new(data: T, decision: U) -> DT<T, U> {
         DT(Rc::new(RefCell::new(Node {
@@ -346,9 +342,9 @@ where
             match partial_op {
                 PartialOp::Min => {
                     let link = &self.current.clone().unwrap();
-                    // Start min value
-                    let mut min_node = &link.borrow().children[0];
                     let children = &link.borrow().children;
+                    // Start min value
+                    let mut min_node = &children[0];
                     for (i, child) in children.iter().enumerate() {
                         // Continue if decision is none
                         if child.borrow().decision.is_none() {
@@ -369,9 +365,9 @@ where
                 }
                 PartialOp::Max => {
                     let link = &self.current.clone().unwrap();
-                    // Start max value
-                    let mut max_node = &link.borrow().children[0];
                     let children = &link.borrow().children;
+                    // Start max value
+                    let mut max_node = &children[0];
                     for (i, child) in children.iter().enumerate() {
                         // Continue if decision is none
                         if child.borrow().decision.is_none() {

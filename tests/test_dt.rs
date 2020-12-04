@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+    use cdt::decision_tree;
     use cdt::{PartialOp, Traverse, DT};
 
     #[test]
@@ -14,7 +15,7 @@ mod tests {
             .append(DT::new("data7", 6));
 
         let mut travel = Traverse::start(root);
-        println!("{:?}", travel.traverse(7, PartialOp::Max));
+        println!("{:?}", travel.traverse(4, PartialOp::Min));
     }
 
     #[test]
@@ -23,6 +24,23 @@ mod tests {
         // Test appending itself
         let mut root = DT::new("root", true);
         root.append(root.clone());
+    }
+
+    #[test]
+    fn test_macro() {
+        let mut root = DT::init("data1");
+        println!(
+            "{:?}",
+            decision_tree!(root =>
+                DT::new("data1", 1),
+                DT::new("data2", 2),
+                DT::new("data3", 3),
+            )
+            .first().unwrap()
+        );
+
+        /* let mut travel = Traverse::start(root);
+        println!("{:?}", travel.traverse(4, PartialOp::Min)); */
     }
 
     #[test]
