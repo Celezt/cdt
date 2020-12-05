@@ -12,6 +12,7 @@ use std::rc::{Rc, Weak};
 type Link<'a, T, U> = Rc<RefCell<Node<'a, T, U>>>;
 /// Weak mutable reference.
 type WeakLink<'a, T, U> = Weak<RefCell<Node<'a, T, U>>>;
+/// Mutable reference to an hash map.
 type HashLink<'a, T, U> = Rc<RefCell<std::collections::HashMap<&'a str, WeakLink<'a, T, U>>>>;
 
 /// Partial Operator.
@@ -118,18 +119,6 @@ impl<'a, T, U> DT<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
-    /// Initialize the decision tree.
-    /// It is also possible to use `new`, but there is no reason to give the root any decisions.
-    pub fn init(id: &'a str) -> DT<'a, T, U> {
-        // Initialize the hash map
-        let hash = Rc::new(RefCell::new(std::collections::HashMap::new()));
-        // Create new decision tree
-        let dt: DT<'a, T, U> = DT::new(id, None, None, hash.clone());
-        // insert the new decision tree into the hash map
-        hash.borrow_mut().insert(id, Rc::downgrade(&dt.0).clone());
-        dt
-    }
-
     /// Create new instance of a node.
     fn new(
         id: &'a str,
@@ -146,6 +135,45 @@ where
             data: data,
             hash: hash,
         })))
+    }
+    /// Initialize the decision tree.
+    /// It is also possible to use `new`, but there is no reason to give the root any decisions.
+    pub fn init() -> DT<'a, T, U> {
+        // Initialize the hash map
+        let hash = Rc::new(RefCell::new(std::collections::HashMap::new()));
+        // Create new decision tree
+        let dt: DT<'a, T, U> = DT::new("root", None, None, hash.clone());
+        // insert the new decision tree into the hash map
+        hash.borrow_mut()
+            .insert("root", Rc::downgrade(&dt.0).clone());
+        dt
+    }
+    /// Append a new child to this node.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the node tries to append to itself.
+    pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
+        let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
+        // Insert id
+        self.0
+            .borrow()
+            .hash
+            .borrow_mut()
+            .insert(id, Rc::downgrade(&new_child.0).clone());
+
+        // Borrow the reference
+        let mut self_borrow = self.0.borrow_mut();
+        let mut new_child_borrow = new_child.0.borrow_mut();
+
+        // Borrow a reference of the latest parent (this)
+        new_child_borrow.latest_parent = Some(Rc::downgrade(&self.0));
+        // Borrow a reference of the latest child (new_child)
+        self_borrow.latest_child = Some(new_child.0.clone());
+
+        self_borrow.children.push(new_child.0.clone());
+
+        self.clone()
     }
     /// Returns the amount of children that node contains.
     pub fn len(&self) -> usize {
@@ -210,12 +238,8 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn root(&self) -> DT<'a, T, U> {
-        // Recursion
-        match self.latest_parent() {
-            Some(_) => self.latest_parent().unwrap().root(),
-            None => self.clone(),
-        }
+    pub fn root(&self) -> Option<DT<'a, T, U>> {
+        self.find("root")
     }
     /// Returns a node based on the steps in the hierarchy.
     /// If it is unable to go back that far, return `None`.
@@ -237,32 +261,10 @@ where
         }
     }
     pub fn find(&self, find_id: &'a str) -> Option<DT<'a, T, U>> {
-        let current = self.root();
-        loop {
-            for i in self.0.borrow().children.iter() {
-                if i.borrow().id == find_id {}
-            }
+        match self.root().unwrap().0.borrow().hash.borrow().get(find_id) {
+            Some(ref x) => Some(DT(try_opt!(x.upgrade()))),
+            None => None,
         }
-    }
-    /// Append a new child to this node.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the node tries to append to itself.
-    pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
-        let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
-
-        // Borrow the reference
-        let mut self_borrow = self.0.borrow_mut();
-        let mut new_child_borrow = new_child.0.borrow_mut();
-        // Borrow a reference of the latest parent (this)
-        new_child_borrow.latest_parent = Some(Rc::downgrade(&self.0));
-        // Borrow a reference of the latest child (new_child)
-        self_borrow.latest_child = Some(new_child.0.clone());
-
-        self_borrow.children.push(new_child.0.clone());
-
-        self.clone()
     }
     /// Returns true if it has any children.
     pub fn has_children(&self) -> bool {

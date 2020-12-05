@@ -5,7 +5,7 @@ mod tests {
 
     #[test]
     fn test_dt() {
-        let mut tree = DT::init("root");
+        let mut tree = DT::init();
 
         tree.append("1", "data2", 1)
             .append("2", "data3", 2)
@@ -13,6 +13,7 @@ mod tests {
             .append("4", "data5", 4)
             .append("5", "data6", 5)
             .append("6", "data7", 6);
+        println!("{:?}", tree.find("root"));
 
         let mut travel = Traverse::start(tree);
         println!("{:?}", travel.traverse(0, PartialOp::Min));
