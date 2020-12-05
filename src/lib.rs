@@ -5,7 +5,7 @@ mod macros;
 #[allow(unused_imports)]
 use crate::macros::*;
 
-use std::cell::{Ref, RefCell, RefMut};
+use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// Mutable reference.
@@ -42,7 +42,7 @@ where
     latest_parent: Option<WeakLink<T, U>>,
     latest_child: Option<Link<T, U>>,
     decision: Option<U>,
-    data: T,
+    data: Option<T>,
 }
 
 /// Cloning a 'Node' only increments a reference count. It does not copy the data.
@@ -83,7 +83,7 @@ where
     U: PartialEq + PartialOrd + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        std::fmt::Display::fmt(&self.borrow(), f)
+        std::fmt::Display::fmt(&self, f)
     }
 }
 
@@ -94,7 +94,7 @@ where
 {
     /// Returns the data value.
     pub fn data_clone(&self) -> T {
-        self.0.borrow().data.clone()
+        self.0.borrow().data.clone().unwrap()
     }
 }
 
@@ -105,7 +105,7 @@ where
 {
     /// Returns the data value.
     pub fn data(&self) -> T {
-        self.0.borrow().data
+        self.0.borrow().data.unwrap()
     }
 }
 
@@ -115,13 +115,13 @@ where
 {
     /// Initialize the decision tree.
     /// It is also possible to use `new`, but there is no reason to give the root any decisions.
-    pub fn init(data: T) -> DT<T, U> {
+    pub fn init() -> DT<T, U> {
         DT(Rc::new(RefCell::new(Node {
             children: Vec::new(),
             latest_parent: None,
             latest_child: None,
             decision: None,
-            data: data,
+            data: None,
         })))
     }
 
@@ -132,7 +132,7 @@ where
             latest_parent: None,
             latest_child: None,
             decision: Some(decision),
-            data: data,
+            data: Some(data),
         })))
     }
     /// Returns the amount of children that node contains.
@@ -261,22 +261,6 @@ where
         } else {
             Some(self.clone())
         }
-    }
-    /// Returns a shared reference to this node's data
-    ///
-    /// # Panics
-    ///
-    /// Panics if the node is currently mutably borrowed.
-    pub fn borrow(&self) -> Ref<T> {
-        Ref::map(self.0.borrow(), |v| &v.data)
-    }
-    /// Returns a unique/mutable reference to this node's data
-    ///
-    /// # Panics
-    ///
-    /// Panics if the node is currently borrowed.
-    pub fn borrow_mut(&mut self) -> RefMut<T> {
-        RefMut::map(self.0.borrow_mut(), |v| &mut v.data)
     }
     /// Append a new child to this node.
     ///

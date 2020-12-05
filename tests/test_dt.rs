@@ -5,7 +5,7 @@ mod tests {
 
     #[test]
     fn test_dt() {
-        let mut root = DT::init("data1");
+        let mut root = DT::init();
 
         root.append(DT::new("data2", 1))
             .append(DT::new("data3", 2))
@@ -15,7 +15,7 @@ mod tests {
             .append(DT::new("data7", 6));
 
         let mut travel = Traverse::start(root);
-        println!("{:?}", travel.traverse(4, PartialOp::Min));
+        println!("{:?}", travel.traverse(0, PartialOp::Min));
     }
 
     #[test]
@@ -28,24 +28,20 @@ mod tests {
 
     #[test]
     fn test_macro() {
-        let mut root = DT::init("data1");
-        println!(
-            "{:?}",
-            decision_tree!(root =>
-                DT::new("data1", 1),
-                DT::new("data2", 2),
-                DT::new("data3", 3),
-            )
-            .first().unwrap()
-        );
+        let root = DT::init();
 
-        /* let mut travel = Traverse::start(root);
-        println!("{:?}", travel.traverse(4, PartialOp::Min)); */
+        decision_tree!(&root.clone() =>
+            "data1": 1,
+            "data2": 2,
+            "data3": 3,
+        );
+        let mut travel = Traverse::start(root);
+        println!("{:?}", travel.traverse(1, PartialOp::Equal));
     }
 
     #[test]
     fn test_move() {
-        let mut root = DT::init("data1");
+        let mut root = DT::init();
         root.append(DT::new("data2", false))
             .latest_child()
             .unwrap()
@@ -81,7 +77,7 @@ mod tests {
 
     #[test]
     fn test_iterate_1() {
-        let mut root = DT::init("0_0");
+        let mut root = DT::init();
         root.append(DT::new("1", 2))
             .latest_child()
             .unwrap()
@@ -113,7 +109,7 @@ mod tests {
         struct Data<'a> {
             text: &'a str,
         }
-        let mut root = DT::init(Data { text: "init" });
+        let mut root = DT::init();
         root.append(DT::new(Data { text: "hey" }, 'a'))
             .latest_child()
             .unwrap()

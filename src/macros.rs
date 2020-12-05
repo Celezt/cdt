@@ -11,8 +11,8 @@ macro_rules! try_opt {
 
 #[macro_export]
 macro_rules! decision_tree {
-    ($tree:ident => $($element:expr),+ $(,)?) => {{
-        $($tree.append($element);)+
+    (&$tree:expr => $($data:tt : $decision:tt),+ $(,)?) => {{
+        $($tree.append(DT::new($data, $decision));)+
         $tree
     }};
 }
