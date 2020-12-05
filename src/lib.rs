@@ -95,23 +95,18 @@ where
 
 impl<'a, T, U> DT<'a, T, U>
 where
-    T: Clone,
-    U: PartialEq + PartialOrd + Copy,
-{
-    /// Returns the data value.
-    pub fn data_clone(&self) -> T {
-        self.0.borrow().data.clone().unwrap()
-    }
-}
-
-impl<'a, T, U> DT<'a, T, U>
-where
     T: Copy,
     U: PartialEq + PartialOrd + Copy,
 {
-    /// Returns the data value.
-    pub fn data(&self) -> T {
-        self.0.borrow().data.unwrap()
+    /// Returns the content inside the node.
+    ///
+    /// Requires the content to inherit `Copy` trait.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
+    pub fn content(&self) -> Option<T> {
+        self.0.borrow().data
     }
 }
 
@@ -136,11 +131,12 @@ where
             hash: hash,
         })))
     }
+
     /// Initialize the decision tree.
     /// It is also possible to use `new`, but there is no reason to give the root any decisions.
     pub fn init() -> DT<'a, T, U> {
         // Initialize the hash map
-        let hash = Rc::new(RefCell::new(std::collections::HashMap::new()));
+        let hash = &Rc::new(RefCell::new(std::collections::HashMap::new()));
         // Create new decision tree
         let dt: DT<'a, T, U> = DT::new("root", None, None, hash.clone());
         // insert the new decision tree into the hash map
@@ -148,12 +144,14 @@ where
             .insert("root", Rc::downgrade(&dt.0).clone());
         dt
     }
+
     /// Append a new child to this node.
     ///
     /// # Panics
     ///
     /// Panics if the node tries to append to itself.
     pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
+        assert!(!self.0.borrow().hash.borrow().contains_key(id));
         let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
         // Insert id
         self.0
@@ -175,19 +173,48 @@ where
 
         self.clone()
     }
+
+    /// If that `Node` exist.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
+    pub fn contains(&self, id: &'a str) -> bool {
+        self.0.borrow().hash.borrow().contains_key(id)
+    }
+
+    /// Returns the amount of `Nodes` currently inside the decision tree.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
+    pub fn tree_len(&self) -> usize {
+        self.0.borrow().hash.borrow().len()
+    }
+
     /// Returns the amount of children that node contains.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn len(&self) -> usize {
         self.0.borrow().children.len()
     }
-    /// Returns the decision value.
+
+    /// Returns the decision value inside the node.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn decision(&self) -> Option<U> {
         self.0.borrow().decision
     }
+
     /// Returns a reference to the latest parent node.
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn latest_parent(&self) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(try_opt!(self
             .0
@@ -196,41 +223,45 @@ where
             .as_ref())
         .upgrade())))
     }
+
     /// Returns a reference to the latest child node.
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn latest_child(&self) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(self.0.borrow().latest_child.as_ref()).clone()))
     }
+
     /// Returns a reference to a child by the index
-    ///
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
-    pub fn child(&self, index: usize) -> Option<DT<'a, T, U>> {
+    /// Panics if the `Node` is currently mutably borrowed.
+    pub fn child_index(&self, index: usize) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(self.0.borrow().children.get(index)).clone()))
     }
+
     /// Returns a reference to the first child.
     ///
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn first(&self) -> Option<DT<'a, T, U>> {
-        self.child(0)
+        self.child_index(0)
     }
+
     /// Returns a reference to the last child.
     ///
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn last(&self) -> Option<DT<'a, T, U>> {
-        self.child(self.len() - 1)
+        self.child_index(self.len() - 1)
     }
+
     /// Returns the root of the decision tree.
     ///
     /// O(N)
@@ -241,14 +272,15 @@ where
     pub fn root(&self) -> Option<DT<'a, T, U>> {
         self.find("root")
     }
-    /// Returns a node based on the steps in the hierarchy.
+
+    /// Returns a `Node` based on the steps in the hierarchy.
     /// If it is unable to go back that far, return `None`.
     ///
     /// O(N)
     ///
     /// # Panics
     ///
-    /// Panics if the node is currently mutably borrowed.
+    /// Panics if the `None` is currently mutably borrowed.
     pub fn back(&self, steps: usize) -> Option<DT<'a, T, U>> {
         if steps > 0 {
             // Recursion
@@ -260,21 +292,42 @@ where
             Some(self.clone())
         }
     }
+
+    /// Returns the `Node` if it exist.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn find(&self, find_id: &'a str) -> Option<DT<'a, T, U>> {
-        match self.root().unwrap().0.borrow().hash.borrow().get(find_id) {
+        match self.0.borrow().hash.borrow().get(find_id) {
             Some(ref x) => Some(DT(try_opt!(x.upgrade()))),
             None => None,
         }
     }
+
     /// Returns true if it has any children.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn has_children(&self) -> bool {
-        self.0.borrow().children.len() > 0
+        self.len() > 0
     }
+
     /// Returns true if it has any parents (not root).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn has_parent(&self) -> bool {
         self.latest_parent().is_some()
     }
+
     /// Returns true if it is the root (no parents).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `Node` is currently mutably borrowed.
     pub fn is_root(&self) -> bool {
         self.latest_parent().is_none()
     }
