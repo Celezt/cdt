@@ -9,10 +9,11 @@ macro_rules! try_opt {
     };
 }
 
-#[macro_export]
+/* #[macro_export]
 macro_rules! decision_tree {
-    (&$tree:expr => $($data:tt : $decision:tt),+ $(,)?) => {{
-        $($tree.append(DT::new($data, $decision));)+
-        $tree
+    ($($data:tt : $decision:tt $(= $child:expr)?),+ $(,)?) => {{
+        let mut root = DT::init();
+        $(root.append(DT::new($data, $decision));)+
+        root
     }};
-}
+} */

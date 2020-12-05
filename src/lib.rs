@@ -9,9 +9,10 @@ use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
 /// Mutable reference.
-type Link<T, U> = Rc<RefCell<Node<T, U>>>;
+type Link<'a, T, U> = Rc<RefCell<Node<'a, T, U>>>;
 /// Weak mutable reference.
-type WeakLink<T, U> = Weak<RefCell<Node<T, U>>>;
+type WeakLink<'a, T, U> = Weak<RefCell<Node<'a, T, U>>>;
+type HashLink<'a, T, U> = Rc<RefCell<std::collections::HashMap<&'a str, WeakLink<'a, T, U>>>>;
 
 /// Partial Operator.
 #[derive(Debug, Eq, PartialEq)]
@@ -29,24 +30,26 @@ pub enum PartialOp {
     Median,
 }
 
-pub struct DT<T, U>(Link<T, U>)
+pub struct DT<'a, T, U>(Link<'a, T, U>)
 where
     U: PartialEq + PartialOrd + Copy;
 
 #[derive(std::fmt::Debug)]
-struct Node<T, U>
+struct Node<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
-    children: Vec<Link<T, U>>,
-    latest_parent: Option<WeakLink<T, U>>,
-    latest_child: Option<Link<T, U>>,
+    id: &'a str,
+    children: Vec<Link<'a, T, U>>,
+    latest_parent: Option<WeakLink<'a, T, U>>,
+    latest_child: Option<Link<'a, T, U>>,
     decision: Option<U>,
     data: Option<T>,
+    hash: HashLink<'a, T, U>,
 }
 
 /// Cloning a 'Node' only increments a reference count. It does not copy the data.
-impl<T, U> Clone for DT<T, U>
+impl<'a, T, U> Clone for DT<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
@@ -55,19 +58,20 @@ where
     }
 }
 
-impl<T, U: PartialEq + PartialOrd> PartialEq for DT<T, U>
+impl<'a, T, U> PartialEq for DT<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
-    fn eq(&self, other: &DT<T, U>) -> bool {
+    fn eq(&self, other: &DT<'a, T, U>) -> bool {
         Rc::ptr_eq(&self.0, &other.0)
     }
 }
 
 // If T has trait debug
-impl<T: std::fmt::Debug, U: std::fmt::Debug> std::fmt::Debug for DT<T, U>
+impl<'a, T, U> std::fmt::Debug for DT<'a, T, U>
 where
-    U: PartialEq + PartialOrd + Copy,
+    T: std::fmt::Debug,
+    U: PartialEq + PartialOrd + Copy + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         let self_borrow = self.0.borrow();
@@ -78,8 +82,9 @@ where
     }
 }
 
-impl<T: std::fmt::Display, U> std::fmt::Display for DT<T, U>
+impl<'a, T, U> std::fmt::Display for DT<'a, T, U>
 where
+    T: std::fmt::Display,
     U: PartialEq + PartialOrd + Copy,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -87,7 +92,7 @@ where
     }
 }
 
-impl<T, U> DT<T, U>
+impl<'a, T, U> DT<'a, T, U>
 where
     T: Clone,
     U: PartialEq + PartialOrd + Copy,
@@ -98,7 +103,7 @@ where
     }
 }
 
-impl<T, U> DT<T, U>
+impl<'a, T, U> DT<'a, T, U>
 where
     T: Copy,
     U: PartialEq + PartialOrd + Copy,
@@ -109,30 +114,37 @@ where
     }
 }
 
-impl<T, U> DT<T, U>
+impl<'a, T, U> DT<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
     /// Initialize the decision tree.
     /// It is also possible to use `new`, but there is no reason to give the root any decisions.
-    pub fn init() -> DT<T, U> {
-        DT(Rc::new(RefCell::new(Node {
-            children: Vec::new(),
-            latest_parent: None,
-            latest_child: None,
-            decision: None,
-            data: None,
-        })))
+    pub fn init(id: &'a str) -> DT<'a, T, U> {
+        // Initialize the hash map
+        let hash = Rc::new(RefCell::new(std::collections::HashMap::new()));
+        // Create new decision tree
+        let dt: DT<'a, T, U> = DT::new(id, None, None, hash.clone());
+        // insert the new decision tree into the hash map
+        hash.borrow_mut().insert(id, Rc::downgrade(&dt.0).clone());
+        dt
     }
 
     /// Create new instance of a node.
-    pub fn new(data: T, decision: U) -> DT<T, U> {
+    fn new(
+        id: &'a str,
+        data: Option<T>,
+        decision: Option<U>,
+        hash: HashLink<'a, T, U>,
+    ) -> DT<'a, T, U> {
         DT(Rc::new(RefCell::new(Node {
+            id: id,
             children: Vec::new(),
             latest_parent: None,
             latest_child: None,
-            decision: Some(decision),
-            data: Some(data),
+            decision: decision,
+            data: data,
+            hash: hash,
         })))
     }
     /// Returns the amount of children that node contains.
@@ -148,7 +160,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn latest_parent(&self) -> Option<DT<T, U>> {
+    pub fn latest_parent(&self) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(try_opt!(self
             .0
             .borrow()
@@ -161,7 +173,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn latest_child(&self) -> Option<DT<T, U>> {
+    pub fn latest_child(&self) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(self.0.borrow().latest_child.as_ref()).clone()))
     }
     /// Returns a reference to a child by the index
@@ -170,7 +182,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn child(&self, index: usize) -> Option<DT<T, U>> {
+    pub fn child(&self, index: usize) -> Option<DT<'a, T, U>> {
         Some(DT(try_opt!(self.0.borrow().children.get(index)).clone()))
     }
     /// Returns a reference to the first child.
@@ -179,7 +191,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn first(&self) -> Option<DT<T, U>> {
+    pub fn first(&self) -> Option<DT<'a, T, U>> {
         self.child(0)
     }
     /// Returns a reference to the last child.
@@ -188,7 +200,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn last(&self) -> Option<DT<T, U>> {
+    pub fn last(&self) -> Option<DT<'a, T, U>> {
         self.child(self.len() - 1)
     }
     /// Returns the root of the decision tree.
@@ -198,7 +210,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn root(&self) -> DT<T, U> {
+    pub fn root(&self) -> DT<'a, T, U> {
         // Recursion
         match self.latest_parent() {
             Some(_) => self.latest_parent().unwrap().root(),
@@ -213,7 +225,7 @@ where
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
-    pub fn back(&self, steps: usize) -> Option<DT<T, U>> {
+    pub fn back(&self, steps: usize) -> Option<DT<'a, T, U>> {
         if steps > 0 {
             // Recursion
             match self.latest_parent() {
@@ -224,42 +236,12 @@ where
             Some(self.clone())
         }
     }
-    /// Returns a node based on the steps in the hierarchy.
-    /// If it is unable to go back that far, return `None`.
-    ///
-    /// O(N)
-    ///
-    /// # Panics
-    ///
-    /// Panics if the node is currently mutably borrowed.
-    pub fn forward_first(&self, steps: usize) -> Option<DT<T, U>> {
-        if steps > 0 {
-            // Recursion
-            match self.first() {
-                Some(_) => self.first().unwrap().forward_first(steps - 1),
-                None => None,
+    pub fn find(&self, find_id: &'a str) -> Option<DT<'a, T, U>> {
+        let current = self.root();
+        loop {
+            for i in self.0.borrow().children.iter() {
+                if i.borrow().id == find_id {}
             }
-        } else {
-            Some(self.clone())
-        }
-    }
-    /// Returns a node based on the steps in the hierarchy.
-    /// If it is unable to go back that far, return `None`.
-    ///
-    /// O(N)
-    ///
-    /// # Panics
-    ///
-    /// Panics if the node is currently mutably borrowed.
-    pub fn forward_last(&self, steps: usize) -> Option<DT<T, U>> {
-        if steps > 0 {
-            // Recursion
-            match self.last() {
-                Some(_) => self.last().unwrap().forward_last(steps - 1),
-                None => None,
-            }
-        } else {
-            Some(self.clone())
         }
     }
     /// Append a new child to this node.
@@ -267,8 +249,8 @@ where
     /// # Panics
     ///
     /// Panics if the node tries to append to itself.
-    pub fn append(&mut self, new_child: DT<T, U>) -> DT<T, U> {
-        assert!(*self != new_child, "Not legal to append to itself");
+    pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
+        let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
 
         // Borrow the reference
         let mut self_borrow = self.0.borrow_mut();
@@ -296,19 +278,19 @@ where
     }
 }
 
-pub struct Traverse<T, U>
+pub struct Traverse<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
-    current: Option<Link<T, U>>,
+    current: Option<Link<'a, T, U>>,
 }
 
-impl<T, U> Traverse<T, U>
+impl<'a, T, U> Traverse<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
     /// Start node to traverse from.
-    pub fn start(node: DT<T, U>) -> Traverse<T, U> {
+    pub fn start(node: DT<'a, T, U>) -> Traverse<'a, T, U> {
         Traverse {
             current: Some(node.0),
         }
@@ -317,7 +299,7 @@ where
     /// Traverse to next node based on its decision.
     ///
     /// If none of the operations is met, return `None`.
-    pub fn traverse(&mut self, decision: U, partial_op: PartialOp) -> Option<DT<T, U>> {
+    pub fn traverse(&mut self, decision: U, partial_op: PartialOp) -> Option<DT<'a, T, U>> {
         // If it is an superiority type or not.
         if matches!(
             partial_op,
