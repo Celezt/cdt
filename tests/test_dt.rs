@@ -13,14 +13,68 @@ mod tests {
             .append("5", "data5", 5)
             .append("6", "data6", 6);
 
-        tree.find("1")
+        tree.find("4")
             .unwrap()
             .append("7", "data7", 7)
             .append("8", "data8", 8);
 
+        tree.find("7")
+            .unwrap()
+            .append("9", "data9", 9)
+            .append("10", "data10", 10);
+
         let mut travel = Traverse::start(tree);
-        println!("{:?}", travel.traverse(1, PartialOp::Equal));
-        println!("{:?}", travel.traverse(8, PartialOp::Equal));
+        println!("{:?}", travel.traverse(4, PartialOp::Equal));
+        println!("{:?}", travel.traverse(1, PartialOp::Less));
+        println!("{:?}", travel.traverse(1, PartialOp::Less));
+    }
+
+    #[test]
+    fn test_partial_op() {
+        let mut tree = DT::init();
+
+        tree.append("1", "data1", "a")
+            .append("2", "data2", "b")
+            .append("3", "data3", "c");
+
+        tree.find("2")
+            .unwrap()
+            .append("4", "data4", "d")
+            .append("5", "data5", "e");
+
+        tree.find("4")
+            .unwrap()
+            .append("6", "data6", "f")
+            .append("7", "data7", "g");
+
+        let mut travel = Traverse::start(tree);
+        println!("{:?}", travel.traverse("b", PartialOp::Equal));
+        println!("{:?}", travel.traverse("b", PartialOp::Less));
+        println!("{:?}", travel.traverse("g", PartialOp::Equal));
+        /* assert!(
+            travel
+                .traverse("b", PartialOp::Median)
+                .unwrap()
+                .decision()
+                .unwrap()
+                == "b"
+        );
+        assert!(
+            travel
+                .traverse("c", PartialOp::Less)
+                .unwrap()
+                .decision()
+                .unwrap()
+                == "d"
+        );
+        assert!(
+            travel
+                .traverse("g", PartialOp::Max)
+                .unwrap()
+                .decision()
+                .unwrap()
+                == "g"
+        ); */
     }
 
     #[test]
@@ -68,6 +122,7 @@ mod tests {
         fn b() {
             println!("b");
         }
+
         fn c() {
             println!("c");
         }
