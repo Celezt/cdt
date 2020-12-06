@@ -3,7 +3,7 @@
 //! `cdt`, also called Celezt's Decision Tree is a
 //! library that implements DT to rust.
 //!
-//! It is inspired from these repositories:
+//! It is inspired by these repositories:
 //! https://github.com/SimonSapin/rust-forest
 //! https://github.com/RazrFalcon/rctree/blob/master/src/lib.rs
 
