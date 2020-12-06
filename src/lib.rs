@@ -1,10 +1,5 @@
 // https://github.com/SimonSapin/rust-forest
 // https://github.com/RazrFalcon/rctree/blob/master/src/lib.rs
-
-mod macros;
-#[allow(unused_imports)]
-use crate::macros::*;
-
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 
@@ -14,6 +9,17 @@ type Link<'a, T, U> = Rc<RefCell<Node<'a, T, U>>>;
 type WeakLink<'a, T, U> = Weak<RefCell<Node<'a, T, U>>>;
 /// Mutable reference to an hash map.
 type HashLink<'a, T, U> = Rc<RefCell<std::collections::HashMap<&'a str, WeakLink<'a, T, U>>>>;
+
+/// Return value if `Some`, else return `None`.
+#[macro_export]
+macro_rules! try_opt {
+    ($expr: expr) => {
+        match $expr {
+            Some(value) => value,
+            None => return None,
+        }
+    };
+}
 
 /// Partial Operator.
 #[derive(Debug, Eq, PartialEq)]
@@ -75,8 +81,8 @@ where
     U: PartialEq + PartialOrd + Copy + std::fmt::Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let self_borrow = self.0.borrow();
-        f.debug_tuple("Node")
+        let self_borrow = &self.0.borrow();
+        f.debug_tuple(&self_borrow.id)
             .field(&self_borrow.data)
             .field(&self_borrow.decision)
             .finish()
@@ -145,13 +151,16 @@ where
         dt
     }
 
-    /// Append a new child to this node.
+    /// Append a new child to this `Node`.
     ///
     /// # Panics
     ///
-    /// Panics if the node tries to append to itself.
+    /// Panics if the `Node` has the same id as one that already exist.
     pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
-        assert!(!self.0.borrow().hash.borrow().contains_key(id));
+        assert!(
+            !self.0.borrow().hash.borrow().contains_key(id),
+            "Not allowed to append a node with the same id as one that already exist."
+        );
         let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
         // Insert id
         self.0
@@ -264,8 +273,6 @@ where
 
     /// Returns the root of the decision tree.
     ///
-    /// O(N)
-    ///
     /// # Panics
     ///
     /// Panics if the node is currently mutably borrowed.
@@ -275,8 +282,6 @@ where
 
     /// Returns a `Node` based on the steps in the hierarchy.
     /// If it is unable to go back that far, return `None`.
-    ///
-    /// O(N)
     ///
     /// # Panics
     ///

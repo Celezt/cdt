@@ -1,140 +1,97 @@
 #[cfg(test)]
 mod tests {
-    //use cdt::decision_tree;
     use cdt::{PartialOp, Traverse, DT};
 
     #[test]
     fn test_dt() {
         let mut tree = DT::init();
 
-        tree.append("1", "data2", 1)
-            .append("2", "data3", 2)
-            .append("3", "data4", 3)
-            .append("4", "data5", 4)
-            .append("5", "data6", 5)
-            .append("6", "data7", 6);
-        println!("{:?}", tree.find("root"));
+        tree.append("1", "data1", 1)
+            .append("2", "data2", 2)
+            .append("3", "data3", 3)
+            .append("4", "data4", 4)
+            .append("5", "data5", 5)
+            .append("6", "data6", 6);
+
+        tree.find("1")
+            .unwrap()
+            .append("7", "data7", 7)
+            .append("8", "data8", 8);
 
         let mut travel = Traverse::start(tree);
-        println!("{:?}", travel.traverse(0, PartialOp::Min));
-    }
-
-    /* #[test]
-    #[should_panic(expected = "Not legal to append to itself")]
-    fn test_overwrite_itself() {
-        // Test appending itself
-        let mut root = DT::new("root", true);
-        root.append(root.clone());
-    } */
-
-    /* #[test]
-    fn test_macro() {
-        let tree = decision_tree!(
-            "data1": 1 = decision_tree!(
-                "child1": 1,
-                "child2": 2,
-                "child3": 3,
-            ),
-            "data2": 2,
-            "data3": 3,
-        );
-        let mut travel = Traverse::start(tree);
-        println!("{:?}", travel.traverse(3, PartialOp::Equal));
-    } */
-
-    /* #[test]
-    fn test_move() {
-        let mut root = DT::init();
-        root.append(DT::new("data2", false))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("data3", true))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("data4", false))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("data5", true))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("data6", false))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("data7", true))
-            .append(DT::new("data8", false));
-
-        println!("{:#?}", root.first());
-        assert!(root.first().is_some());
-        println!("{:#?}", root.last());
-        assert!(root.last().is_some());
-
-        println!("{:#?}", root.forward_first(6));
-
-        println!("{:#?}", root.forward_first(6));
-        assert!(root.forward_first(6).is_some());
-        assert!(root.forward_first(7).is_none());
-
-        println!("{:#?}", root.forward_last(6));
-        assert!(root.forward_last(6).is_some());
+        println!("{:?}", travel.traverse(1, PartialOp::Equal));
+        println!("{:?}", travel.traverse(8, PartialOp::Equal));
     }
 
     #[test]
-    fn test_iterate_1() {
-        let mut root = DT::init();
-        root.append(DT::new("1", 2))
+    fn test_len() {
+        let mut tree = DT::init();
+        tree.append("1", "data1", 1)
             .latest_child()
             .unwrap()
-            .append(DT::new("1_1", 3))
-            .append(DT::new("1_2", 4))
+            .append("7", "child1", 7)
+            .append("8", "child1", 7)
             .latest_parent()
             .unwrap()
-            .append(DT::new("2", 5))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("2_1", 8))
-            .append(DT::new("2_2", 4))
-            .latest_child()
-            .unwrap()
-            .append(DT::new("2_2_1", 2))
-            .append(DT::new("2_2_2", 1))
-            .append(DT::new("2_2_3", 4));
-
-        let mut travel = Traverse::start(root);
-
-        println!("{:?}", travel.traverse(3, PartialOp::Less));
-        println!("{:?}", travel.traverse(5, PartialOp::Greater));
-        println!("{:?}", travel.traverse(4, PartialOp::Equal));
+            .append("2", "data2", 2)
+            .append("3", "data3", 3)
+            .append("4", "data4", 4)
+            .append("5", "data5", 5)
+            .append("6", "data6", 6);
+        assert!(tree.len() == 6);
+        assert!(tree.tree_len() == 9);
     }
 
     #[test]
-    fn test_iterate_2() {
-        #[derive(Debug)]
-        struct Data<'a> {
-            text: &'a str,
+    #[should_panic(
+        expected = "Not allowed to append a node with the same id as one that already exist."
+    )]
+    fn test_same_id() {
+        let mut tree = DT::init();
+        tree.append("1", "data1", 1).append("1", "data2", 2);
+    }
+
+    #[test]
+    fn test_fn_pointers() {
+        #[derive(Copy, Clone, Debug)]
+        struct Package<T>(T);
+        impl<T> std::ops::Deref for Package<T> {
+            type Target = T;
+            fn deref(&self) -> &Self::Target {
+                &self.0
+            }
         }
-        let mut root = DT::init();
-        root.append(DT::new(Data { text: "hey" }, 'a'))
-            .latest_child()
-            .unwrap()
-            .append(DT::new(Data { text: "what" }, 'b'))
-            .append(DT::new(Data { text: "is" }, 'c'))
-            .latest_parent()
-            .unwrap()
-            .append(DT::new(Data { text: "up" }, 'd'))
-            .latest_child()
-            .unwrap()
-            .append(DT::new(Data { text: "are" }, 'e'))
-            .append(DT::new(Data { text: "you" }, 'f'))
-            .latest_child()
-            .unwrap()
-            .append(DT::new(Data { text: "alright" }, 'g'))
-            .append(DT::new(Data { text: "bro" }, 'h'))
-            .append(DT::new(Data { text: "?" }, 'i'));
+        fn a() {
+            println!("a");
+        }
 
-        let mut travel = Traverse::start(root);
+        fn b() {
+            println!("b");
+        }
+        fn c() {
+            println!("c");
+        }
+        fn d() {
+            println!("d");
+        }
 
-        println!("{:?}", travel.traverse('c', PartialOp::Less));
-        println!("{:?}", travel.traverse('f', PartialOp::Equal));
-        println!("{:?}", travel.traverse('h', PartialOp::Greater));
-    } */
+        let mut tree: DT<Package<fn()>, i32> = DT::init();
+        tree.append("1", Package(a), 1)
+            .append("2", Package(b), 2)
+            .latest_child()
+            .unwrap()
+            .append("3", Package(c), 3)
+            .append("4", Package(d), 4);
+        let mut travel = Traverse::start(tree);
+        travel
+            .traverse(2, PartialOp::Equal)
+            .unwrap()
+            .content()
+            .unwrap()();
+        travel
+            .traverse(3, PartialOp::Equal)
+            .unwrap()
+            .content()
+            .unwrap()();
+    }
 }
