@@ -405,117 +405,124 @@ where
     ///
     /// If none of the operations is met, return `None`.
     pub fn traverse(&mut self, decision: U, partial_op: PartialOp) -> Option<DT<'a, T, U>> {
-        // If it is an superiority type or not.
-        if matches!(
-            partial_op,
-            PartialOp::Min | PartialOp::Max | PartialOp::Median
-        ) {
-            match partial_op {
-                PartialOp::Min => {
-                    let link = &self.current.clone().unwrap();
-                    let children = &link.borrow().children;
-                    // Start min value
-                    let mut min_node = &children[0];
-                    for (i, child) in children.iter().enumerate() {
-                        // Continue if decision is none
-                        if child.borrow().decision.is_none() {
-                            continue;
-                        }
-                        // Set the min node if the child is less than it
-                        if min_node.borrow().decision.unwrap() > child.borrow().decision.unwrap() {
-                            min_node = child;
-                        }
-                        // Return if on the last child
-                        if i >= children.len() - 1 {
-                            // If decision is less than smallest value
-                            if decision < min_node.borrow().decision.unwrap() {
-                                return Some(DT(min_node.clone()));
-                            }
-                        }
-                    }
-                }
-                PartialOp::Max => {
-                    let link = &self.current.clone().unwrap();
-                    let children = &link.borrow().children;
-                    // Start max value
-                    let mut max_node = &children[0];
-                    for (i, child) in children.iter().enumerate() {
-                        // Continue if decision is none
-                        if child.borrow().decision.is_none() {
-                            continue;
-                        }
-                        // Set the max node if the child is greater than it
-                        if max_node.borrow().decision.unwrap() < child.borrow().decision.unwrap() {
-                            max_node = child;
-                        }
-                        // Return if on the last child
-                        if i >= children.len() - 1 {
-                            // If decision is greater than biggest value
-                            if decision > max_node.borrow().decision.unwrap() {
-                                return Some(DT(max_node.clone()));
-                            }
-                        }
-                    }
-                }
-                PartialOp::Median => {
-                    let link = &self.current.clone().unwrap();
-                    let children = &mut link.borrow_mut().children;
-                    // Sort based on decision values
-                    children.sort_by(|a, b| {
-                        a.borrow()
-                            .decision
-                            .unwrap()
-                            .partial_cmp(&b.borrow().decision.unwrap())
-                            .unwrap()
-                    });
-                    // Average value
-                    let average_node = children[children.len() / 2].clone();
-                    // If decision is greater than biggest value
-                    if decision == average_node.borrow().decision.unwrap() {
-                        return Some(DT(average_node.clone()));
-                    }
-                }
-                _ => panic!("{:?} is not supported", partial_op),
-            }
-        } else {
-            for child in self.current.clone().unwrap().borrow().children.iter() {
-                let child_borrow = &child.borrow();
-                // Continue if decision is none
-                if child_borrow.decision.is_none() {
-                    continue;
-                }
+        // If it has any children
+        if self.current.clone().unwrap().borrow().children.len() > 0 {
+            // If it is an superiority type or not.
+            if matches!(
+                partial_op,
+                PartialOp::Min | PartialOp::Max | PartialOp::Median
+            ) {
                 match partial_op {
-                    PartialOp::Greater => {
-                        if decision > child_borrow.decision.unwrap() {
-                            self.current = Some(child.clone());
-                            return Some(DT(child.clone()));
+                    PartialOp::Min => {
+                        let link = &self.current.clone().unwrap();
+                        let children = &link.borrow().children;
+                        // Start min value
+                        let mut min_node = &children[0];
+                        for (i, child) in children.iter().enumerate() {
+                            // Continue if decision is none
+                            if child.borrow().decision.is_none() {
+                                continue;
+                            }
+                            // Set the min node if the child is less than it
+                            if min_node.borrow().decision.unwrap()
+                                > child.borrow().decision.unwrap()
+                            {
+                                min_node = child;
+                            }
+                            // Return if on the last child
+                            if i >= children.len() - 1 {
+                                // If decision is less than smallest value
+                                if decision < min_node.borrow().decision.unwrap() {
+                                    return Some(DT(min_node.clone()));
+                                }
+                            }
                         }
                     }
-                    PartialOp::GreaterEqual => {
-                        if decision >= child_borrow.decision.unwrap() {
-                            self.current = Some(child.clone());
-                            return Some(DT(child.clone()));
+                    PartialOp::Max => {
+                        let link = &self.current.clone().unwrap();
+                        let children = &link.borrow().children;
+                        // Start max value
+                        let mut max_node = &children[0];
+                        for (i, child) in children.iter().enumerate() {
+                            // Continue if decision is none
+                            if child.borrow().decision.is_none() {
+                                continue;
+                            }
+                            // Set the max node if the child is greater than it
+                            if max_node.borrow().decision.unwrap()
+                                < child.borrow().decision.unwrap()
+                            {
+                                max_node = child;
+                            }
+                            // Return if on the last child
+                            if i >= children.len() - 1 {
+                                // If decision is greater than biggest value
+                                if decision > max_node.borrow().decision.unwrap() {
+                                    return Some(DT(max_node.clone()));
+                                }
+                            }
                         }
                     }
-                    PartialOp::Less => {
-                        if decision < child_borrow.decision.unwrap() {
-                            self.current = Some(child.clone());
-                            return Some(DT(child.clone()));
-                        }
-                    }
-                    PartialOp::LessEqual => {
-                        if decision <= child_borrow.decision.unwrap() {
-                            self.current = Some(child.clone());
-                            return Some(DT(child.clone()));
-                        }
-                    }
-                    PartialOp::Equal => {
-                        if decision == child_borrow.decision.unwrap() {
-                            self.current = Some(child.clone());
-                            return Some(DT(child.clone()));
+                    PartialOp::Median => {
+                        let link = &self.current.clone().unwrap();
+                        let children = &mut link.borrow_mut().children;
+                        // Sort based on decision values
+                        children.sort_by(|a, b| {
+                            a.borrow()
+                                .decision
+                                .unwrap()
+                                .partial_cmp(&b.borrow().decision.unwrap())
+                                .unwrap()
+                        });
+                        // Average value
+                        let average_node = children[children.len() / 2].clone();
+                        // If decision is greater than biggest value
+                        if decision == average_node.borrow().decision.unwrap() {
+                            return Some(DT(average_node.clone()));
                         }
                     }
                     _ => panic!("{:?} is not supported", partial_op),
+                }
+            } else {
+                for child in self.current.clone().unwrap().borrow().children.iter() {
+                    let child_borrow = &child.borrow();
+                    // Continue if decision is none
+                    if child_borrow.decision.is_none() {
+                        continue;
+                    }
+                    match partial_op {
+                        PartialOp::Greater => {
+                            if decision > child_borrow.decision.unwrap() {
+                                self.current = Some(child.clone());
+                                return Some(DT(child.clone()));
+                            }
+                        }
+                        PartialOp::GreaterEqual => {
+                            if decision >= child_borrow.decision.unwrap() {
+                                self.current = Some(child.clone());
+                                return Some(DT(child.clone()));
+                            }
+                        }
+                        PartialOp::Less => {
+                            if decision < child_borrow.decision.unwrap() {
+                                self.current = Some(child.clone());
+                                return Some(DT(child.clone()));
+                            }
+                        }
+                        PartialOp::LessEqual => {
+                            if decision <= child_borrow.decision.unwrap() {
+                                self.current = Some(child.clone());
+                                return Some(DT(child.clone()));
+                            }
+                        }
+                        PartialOp::Equal => {
+                            if decision == child_borrow.decision.unwrap() {
+                                self.current = Some(child.clone());
+                                return Some(DT(child.clone()));
+                            }
+                        }
+                        _ => panic!("{:?} is not supported", partial_op),
+                    }
                 }
             }
         }

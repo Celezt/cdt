@@ -30,6 +30,17 @@ mod tests {
     }
 
     #[test]
+    fn test_empty_parent() {
+        let mut tree = DT::init();
+
+        tree.append("id", "data", 1);
+
+        let mut travel = Traverse::start(tree);
+        assert!(travel.traverse(2, PartialOp::Greater).is_some());
+        assert!(travel.traverse(0, PartialOp::Equal).is_none());
+    }
+
+    #[test]
     fn test_partial_op() {
         let mut tree = DT::init();
 
