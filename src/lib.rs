@@ -43,7 +43,7 @@ pub enum Op {
 /// Generic implementation that takes in a unique id `&str` that is implemented as
 /// a hash map. It decides what route to take base on the decision that has `PartialEq` +
 /// `PartialOrd` + `Copy` derived. By using the `Traverse` struct, it is possible to move
-/// along the tree based on what values it compares to.
+/// along the tree.
 ///
 /// # Examples
 ///
