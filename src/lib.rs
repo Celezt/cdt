@@ -28,20 +28,14 @@ macro_rules! try_opt {
     };
 }
 
-/// Partial Operator.
+/// Operator.
 #[derive(Debug, Eq, PartialEq)]
-pub enum PartialOp {
+pub enum Op {
     Equal,
     Greater,
     GreaterEqual,
     Less,
     LessEqual,
-    /// Compare to the smallest value of the available.
-    Min,
-    /// Compare to the biggest value of the available.
-    Max,
-    /// Compare to the median value of the available
-    Median,
 }
 
 /// Decision Tree
@@ -54,33 +48,31 @@ pub enum PartialOp {
 /// # Examples
 ///
 /// ```
-/// use cdt::{DT, Traverse, PartialOp};
+/// use cdt::{DT, Traverse, Op};
 ///
 /// // Initialize a new decision tree by creating a root that
 /// // has by default the id "root"
 /// let mut tree = DT::init();
 ///
 /// /// Append new children to the root
-/// /// .append(unique id, data, decision)
-/// tree.append("first", "banana", true)
-///     .append("second", "apple", false)
-///     .append("third", "orange", false);
+/// /// .append(unique id, data, decision, operator)
+/// tree.append("first", "banana", true, Op::Equal)
+///     .append("second", "apple", false, Op::Equal)
+///     .append("third", "orange", false, Op::Equal);
 ///
 /// /// Get node by its id
 /// tree.find("second").unwrap()
-///     .append("fourth", "red apple", true)
-///     .append("fifth", "green apple", false);
+///     .append("fourth", "red apple", true, Op::Equal)
+///     .append("fifth", "green apple", false, Op::Equal);
 ///
 /// let mut travel = Traverse::start(tree);
 ///
 /// // apple because it is the first one that are false
 /// // The decision goes from left to right (top to bottom)
-/// assert!(travel.traverse(false, PartialOp::Equal)
-///         .unwrap().decision().unwrap() == false);
+/// assert!(travel.traverse(&false).unwrap().decision().unwrap() == false);
 ///
-/// // The first one of the children to apple that are true
-/// assert!(travel.traverse(true, PartialOp::Equal)
-///         .unwrap().decision().unwrap() == true);
+/// // The first one of apple's children that are true
+/// assert!(travel.traverse(&true).unwrap().decision().unwrap() == true);
 /// ```
 pub struct DT<'a, T, U>(Link<'a, T, U>)
 where
@@ -92,6 +84,7 @@ where
     U: PartialEq + PartialOrd + Copy,
 {
     id: &'a str,
+    op: Option<Op>,
     children: Vec<Link<'a, T, U>>,
     latest_parent: Option<WeakLink<'a, T, U>>,
     latest_child: Option<Link<'a, T, U>>,
@@ -168,12 +161,14 @@ where
     /// Create new instance of a node.
     fn new(
         id: &'a str,
+        op: Option<Op>,
         data: Option<T>,
         decision: Option<U>,
         hash: HashLink<'a, T, U>,
     ) -> DT<'a, T, U> {
         DT(Rc::new(RefCell::new(Node {
             id: id,
+            op: op,
             children: Vec::new(),
             latest_parent: None,
             latest_child: None,
@@ -189,7 +184,7 @@ where
         // Initialize the hash map
         let hash = &Rc::new(RefCell::new(std::collections::HashMap::new()));
         // Create new decision tree
-        let dt: DT<'a, T, U> = DT::new("root", None, None, hash.clone());
+        let dt: DT<'a, T, U> = DT::new("root", None, None, None, hash.clone());
         // insert the new decision tree into the hash map
         hash.borrow_mut()
             .insert("root", Rc::downgrade(&dt.0).clone());
@@ -201,12 +196,18 @@ where
     /// # Panics
     ///
     /// Panics if the `Node` has the same id as one that already exist.
-    pub fn append(&mut self, id: &'a str, data: T, decision: U) -> DT<'a, T, U> {
+    pub fn append(&mut self, id: &'a str, data: T, decision: U, op: Op) -> DT<'a, T, U> {
         assert!(
             !self.0.borrow().hash.borrow().contains_key(id),
             "Not allowed to append a node with the same id as one that already exist."
         );
-        let new_child = DT::new(id, Some(data), Some(decision), self.0.borrow().hash.clone());
+        let new_child = DT::new(
+            id,
+            Some(op),
+            Some(data),
+            Some(decision),
+            self.0.borrow().hash.clone(),
+        );
         // Insert id
         self.0
             .borrow()
@@ -387,7 +388,7 @@ pub struct Traverse<'a, T, U>
 where
     U: PartialEq + PartialOrd + Copy,
 {
-    current: Option<Link<'a, T, U>>,
+    current: Link<'a, T, U>,
 }
 
 impl<'a, T, U> Traverse<'a, T, U>
@@ -396,133 +397,53 @@ where
 {
     /// Start node to traverse from.
     pub fn start(node: DT<'a, T, U>) -> Traverse<'a, T, U> {
-        Traverse {
-            current: Some(node.0),
-        }
+        Traverse { current: node.0 }
     }
 
     /// Traverse to next node based on its decision.
     ///
     /// If none of the operations is met, return `None`.
-    pub fn traverse(&mut self, decision: U, partial_op: PartialOp) -> Option<DT<'a, T, U>> {
-        // If it has any children
-        if self.current.clone().unwrap().borrow().children.len() > 0 {
-            // If it is an superiority type or not.
-            if matches!(
-                partial_op,
-                PartialOp::Min | PartialOp::Max | PartialOp::Median
-            ) {
-                match partial_op {
-                    PartialOp::Min => {
-                        let link = &self.current.clone().unwrap();
-                        let children = &link.borrow().children;
-                        // Start min value
-                        let mut min_node = &children[0];
-                        for (i, child) in children.iter().enumerate() {
-                            // Continue if decision is none
-                            if child.borrow().decision.is_none() {
-                                continue;
-                            }
-                            // Set the min node if the child is less than it
-                            if min_node.borrow().decision.unwrap()
-                                > child.borrow().decision.unwrap()
-                            {
-                                min_node = child;
-                            }
-                            // Return if on the last child
-                            if i >= children.len() - 1 {
-                                // If decision is less than smallest value
-                                if decision < min_node.borrow().decision.unwrap() {
-                                    return Some(DT(min_node.clone()));
-                                }
-                            }
-                        }
-                    }
-                    PartialOp::Max => {
-                        let link = &self.current.clone().unwrap();
-                        let children = &link.borrow().children;
-                        // Start max value
-                        let mut max_node = &children[0];
-                        for (i, child) in children.iter().enumerate() {
-                            // Continue if decision is none
-                            if child.borrow().decision.is_none() {
-                                continue;
-                            }
-                            // Set the max node if the child is greater than it
-                            if max_node.borrow().decision.unwrap()
-                                < child.borrow().decision.unwrap()
-                            {
-                                max_node = child;
-                            }
-                            // Return if on the last child
-                            if i >= children.len() - 1 {
-                                // If decision is greater than biggest value
-                                if decision > max_node.borrow().decision.unwrap() {
-                                    return Some(DT(max_node.clone()));
-                                }
-                            }
-                        }
-                    }
-                    PartialOp::Median => {
-                        let link = &self.current.clone().unwrap();
-                        let children = &mut link.borrow_mut().children;
-                        // Sort based on decision values
-                        children.sort_by(|a, b| {
-                            a.borrow()
-                                .decision
-                                .unwrap()
-                                .partial_cmp(&b.borrow().decision.unwrap())
-                                .unwrap()
-                        });
-                        // Average value
-                        let average_node = children[children.len() / 2].clone();
-                        // If decision is greater than biggest value
-                        if decision == average_node.borrow().decision.unwrap() {
-                            return Some(DT(average_node.clone()));
-                        }
-                    }
-                    _ => panic!("{:?} is not supported", partial_op),
+    pub fn traverse(&mut self, decision: &U) -> Option<DT<'a, T, U>> {
+        // If the node has any children
+        if self.current.borrow().children.len() > 0 {
+            for child in self.current.clone().borrow().children.iter() {
+                let child_borrow = &child.borrow();
+                // Continue if decision is none
+                if child_borrow.decision.is_none() {
+                    continue;
                 }
-            } else {
-                for child in self.current.clone().unwrap().borrow().children.iter() {
-                    let child_borrow = &child.borrow();
-                    // Continue if decision is none
-                    if child_borrow.decision.is_none() {
-                        continue;
+                match child_borrow.clone().op.as_ref().unwrap() {
+                    Op::Greater => {
+                        if decision > &child_borrow.decision.unwrap() {
+                            self.current = child.clone();
+                            return Some(DT(child.clone()));
+                        }
                     }
-                    match partial_op {
-                        PartialOp::Greater => {
-                            if decision > child_borrow.decision.unwrap() {
-                                self.current = Some(child.clone());
-                                return Some(DT(child.clone()));
-                            }
+                    Op::GreaterEqual => {
+                        if decision >= &child_borrow.decision.unwrap() {
+                            self.current = child.clone();
+                            return Some(DT(child.clone()));
                         }
-                        PartialOp::GreaterEqual => {
-                            if decision >= child_borrow.decision.unwrap() {
-                                self.current = Some(child.clone());
-                                return Some(DT(child.clone()));
-                            }
-                        }
-                        PartialOp::Less => {
-                            if decision < child_borrow.decision.unwrap() {
-                                self.current = Some(child.clone());
-                                return Some(DT(child.clone()));
-                            }
-                        }
-                        PartialOp::LessEqual => {
-                            if decision <= child_borrow.decision.unwrap() {
-                                self.current = Some(child.clone());
-                                return Some(DT(child.clone()));
-                            }
-                        }
-                        PartialOp::Equal => {
-                            if decision == child_borrow.decision.unwrap() {
-                                self.current = Some(child.clone());
-                                return Some(DT(child.clone()));
-                            }
-                        }
-                        _ => panic!("{:?} is not supported", partial_op),
                     }
+                    Op::Less => {
+                        if decision < &child_borrow.decision.unwrap() {
+                            self.current = child.clone();
+                            return Some(DT(child.clone()));
+                        }
+                    }
+                    Op::LessEqual => {
+                        if decision <= &child_borrow.decision.unwrap() {
+                            self.current = child.clone();
+                            return Some(DT(child.clone()));
+                        }
+                    }
+                    Op::Equal => {
+                        if decision == &child_borrow.decision.unwrap() {
+                            self.current = child.clone();
+                            return Some(DT(child.clone()));
+                        }
+                    }
+                    _ => panic!("{:?} is not supported", child_borrow.op.as_ref().unwrap()),
                 }
             }
         }
