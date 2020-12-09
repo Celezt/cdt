@@ -41,6 +41,17 @@ mod tests {
     }
 
     #[test]
+    fn test_travel_dt() {
+        let mut tree = DT::init();
+
+        tree.append("id", "data", 1, Op::Greater);
+
+        let mut travel = Traverse::start(tree.clone());
+        assert!(travel.traverse(&2).is_some());
+        assert!(travel.dt().root().unwrap() == tree);
+    }
+
+    #[test]
     fn test_partial_op() {
         let mut tree = DT::init();
 

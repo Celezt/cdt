@@ -400,6 +400,11 @@ where
         Traverse { current: node.0 }
     }
 
+    /// Return current as a decision tree node.
+    pub fn dt(&self) -> DT<'a, T, U> {
+        DT(self.current.clone())
+    }
+    // Some(DT(try_opt!(self.0.borrow().latest_child.as_ref()).clone()))
     /// Traverse to next node based on its decision.
     ///
     /// If none of the operations is met, return `None`.
